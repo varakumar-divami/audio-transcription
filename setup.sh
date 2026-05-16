@@ -15,7 +15,7 @@ if [ ! -d ".venv" ]; then
 fi
 
 echo "==> Installing Python dependencies..."
-uv pip install --python .venv/bin/python yt-dlp faster-whisper tqdm
+uv pip install --python .venv/bin/python yt-dlp faster-whisper tqdm fastapi uvicorn python-multipart
 
 echo ""
 echo "Setup complete. Usage:"

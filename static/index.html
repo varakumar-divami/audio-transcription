@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audio Transcriber</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+    }
+
+    header { text-align: center; margin-bottom: 40px; }
+    header h1 { font-size: 2rem; font-weight: 700; }
+    header p  { color: #6e6e73; margin-top: 6px; font-size: 0.95rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 720px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #f5f5f7;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #6e6e73;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab.active { background: #fff; color: #1d1d1f; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* YouTube panel */
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1.5px solid #d1d1d6;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: #0071e3; }
+
+    select {
+      padding: 12px;
+      border: 1.5px solid #d1d1d6;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      background: #fff;
+      outline: none;
+      cursor: pointer;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: #0071e3;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: #0077ed; }
+    button:disabled { background: #a1a1a6; cursor: not-allowed; }
+
+    /* Record panel */
+    .record-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 12px 0;
+    }
+    .mic-btn {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: #0071e3;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      box-shadow: 0 4px 14px rgba(0,113,227,0.4);
+      padding: 0;
+    }
+    .mic-btn:hover { background: #0077ed; transform: scale(1.05); }
+    .mic-btn.recording {
+      background: #e53935;
+      box-shadow: 0 4px 14px rgba(229,57,53,0.4);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .mic-btn svg { width: 36px; height: 36px; fill: #fff; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(229,57,53,0.5); }
+      50%       { box-shadow: 0 0 0 14px rgba(229,57,53,0); }
+    }
+    .rec-label { font-size: 0.9rem; color: #6e6e73; }
+    .rec-label.recording { color: #e53935; font-weight: 600; }
+    .rec-timer { font-size: 1.4rem; font-weight: 700; font-family: monospace; letter-spacing: 2px; color: #1d1d1f; }
+    .rec-model-row { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; color: #6e6e73; }
+
+    /* Steps */
+    .steps { display: flex; gap: 8px; margin-top: 28px; flex-wrap: wrap; }
+    .step {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #f5f5f7;
+      border: 1.5px solid #e5e5ea;
+      font-size: 0.82rem;
+      color: #6e6e73;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .step.active { background: #fff8e1; border-color: #f5a623; color: #b07d00; font-weight: 600; }
+    .step.done   { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; font-weight: 600; }
+    .step.error  { background: #fdecea; border-color: #e53935; color: #c62828; font-weight: 600; }
+
+    /* Segments feed */
+    .segments-box { display: none; margin-top: 24px; }
+    .segments-box h3 { font-size: 0.9rem; color: #6e6e73; margin-bottom: 10px; }
+    .segments-list {
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1.5px solid #e5e5ea;
+      border-radius: 10px;
+      padding: 12px;
+      background: #fafafa;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .seg { padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+    .seg:last-child { border-bottom: none; }
+    .seg-time { color: #a1a1a6; font-size: 0.75rem; margin-right: 8px; font-family: monospace; }
+
+    /* Result */
+    .result-box { display: none; margin-top: 24px; }
+    .result-box h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; }
+    .transcript-text {
+      background: #f5f5f7;
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .result-actions { display: flex; gap: 10px; margin-top: 14px; }
+    .result-actions a, .result-actions button { font-size: 0.85rem; padding: 8px 18px; }
+    .btn-secondary {
+      background: #f5f5f7;
+      color: #1d1d1f;
+      border: 1.5px solid #d1d1d6;
+    }
+    .btn-secondary:hover { background: #e5e5ea; }
+
+    .error-msg { color: #c62828; font-size: 0.9rem; margin-top: 16px; display: none; }
+
+    /* Past outputs */
+    #outputs-list { list-style: none; margin-top: 12px; }
+    #outputs-list li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.875rem; }
+    #outputs-list li:last-child { border-bottom: none; }
+    #outputs-list a { color: #0071e3; text-decoration: none; }
+    #outputs-list a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Audio Transcriber</h1>
+  <p>Transcribe YouTube videos or your own voice to English text. Supports Telugu &amp; English.</p>
+</header>
+
+<div class="card">
+  <!-- Tab switcher -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('youtube')">YouTube URL</button>
+    <button class="tab" onclick="switchTab('record')">Record Voice</button>
+  </div>
+
+  <!-- YouTube panel -->
+  <div class="panel active" id="panel-youtube">
+    <div class="input-row">
+      <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=..." />
+      <select id="yt-model-select">
+        <option value="small" selected>small</option>
+        <option value="medium">medium</option>
+        <option value="large">large</option>
+      </select>
+      <button id="yt-submit-btn" onclick="startYouTube()">Transcribe</button>
+    </div>
+    <div class="steps" id="yt-steps" style="display:none;">
+      <div class="step" id="yt-step-1">1. Downloading</div>
+      <div class="step" id="yt-step-2">2. Transcribing</div>
+      <div class="step" id="yt-step-3">3. Saving</div>
+      <div class="step" id="yt-step-4">4. Done</div>
+    </div>
+    <div class="error-msg" id="yt-error"></div>
+    <div class="segments-box" id="yt-segments-box">
+      <h3>Live segments</h3>
+      <div class="segments-list" id="yt-segments-list"></div>
+    </div>
+    <div class="result-box" id="yt-result-box">
+      <h3>Transcript</h3>
+      <div class="transcript-text" id="yt-transcript"></div>
+      <div class="result-actions">
+        <a id="yt-download-link" href="#" download><button>Download .txt</button></a>
+        <button class="btn-secondary" onclick="copyText('yt-transcript')">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record panel -->
+  <div class="panel" id="panel-record">
+    <div class="record-center">
+      <button class="mic-btn" id="mic-btn" onclick="toggleRecording()">
+        <!-- Mic icon -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 16.93A8.001 8.001 0 0 1 4 11H2a10 10 0 0 0 9 9.95V23h2v-2.05A10 10 0 0 0 22 11h-2a8 8 0 0 1-6.5 6.93V18h-3v-0.07z"/>
+        </svg>
+      </button>
+      <div class="rec-timer" id="rec-timer">00:00</div>
+      <div class="rec-label" id="rec-label">Click to start recording</div>
+      <div class="rec-model-row">
+        Model:
+        <select id="rec-model-select">
+          <option value="small" selected>small</option>
+          <option value="medium">medium</option>
+          <option value="large">large</option>
+        </select>
+      </div>
+    </div>
+    <div class="steps" id="rec-steps" style="display:none;">
+      <div class="step" id="rec-step-1">1. Transcribing</div>
+      <div class="step" id="rec-step-2">2. Saving</div>
+      <div class="step" id="rec-step-3">3. Done</div>
+    </div>
+    <div class="error-msg" id="rec-error"></div>
+    <div class="segments-box" id="rec-segments-box">
+      <h3>Live segments</h3>
+      <div class="segments-list" id="rec-segments-list"></div>
+    </div>
+    <div class="result-box" id="rec-result-box">
+      <h3>Transcript</h3>
+      <div class="transcript-text" id="rec-transcript"></div>
+      <div class="result-actions">
+        <a id="rec-download-link" href="#" download><button>Download .txt</button></a>
+        <button class="btn-secondary" onclick="copyText('rec-transcript')">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Past outputs -->
+<div class="card">
+  <strong>Past Transcripts</strong>
+  <ul id="outputs-list"><li style="color:#a1a1a6;">Loading...</li></ul>
+</div>
+
+<script>
+  // ── Tab switching ──────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', ['youtube','record'][i] === name);
+    });
+    document.getElementById('panel-youtube').classList.toggle('active', name === 'youtube');
+    document.getElementById('panel-record').classList.toggle('active',  name === 'record');
+  }
+
+  // ── Shared polling ─────────────────────────────────────────────
+  function pollJob(job_id, { stepsEl, stepsMap, segmentsBox, segmentsList, resultBox,
+                             transcriptEl, downloadLink, errorEl, submitBtn, onDone }) {
+    let seen = 0;
+    const iv = setInterval(async () => {
+      const job = await fetch(`/api/status/${job_id}`).then(r => r.json());
+
+      // Highlight active step
+      const order = Object.keys(stepsMap);
+      const activeIdx = order.indexOf(job.status);
+      order.forEach((s, i) => {
+        const el = document.getElementById(stepsMap[s]);
+        if (!el) return;
+        el.className = i < activeIdx ? 'step done' : i === activeIdx ? 'step active' : 'step';
+      });
+
+      if (job.status === 'transcribing') segmentsBox.style.display = 'block';
+
+      // Append new segments
+      while (seen < job.segments.length) {
+        const s = job.segments[seen++];
+        const div = document.createElement('div');
+        div.className = 'seg';
+        div.innerHTML = `<span class="seg-time">${s.start}s–${s.end}s</span>${s.text}`;
+        segmentsList.appendChild(div);
+        segmentsList.scrollTop = segmentsList.scrollHeight;
+      }
+
+      if (job.status === 'done') {
+        clearInterval(iv);
+        order.forEach(s => {
+          const el = document.getElementById(stepsMap[s]);
+          if (el) el.className = 'step done';
+        });
+        transcriptEl.textContent = job.transcript;
+        downloadLink.href = `/api/outputs/${encodeURIComponent(job.output_file)}`;
+        downloadLink.setAttribute('download', job.output_file);
+        resultBox.style.display = 'block';
+        if (submitBtn) submitBtn.disabled = false;
+        if (onDone) onDone();
+        loadOutputs();
+      }
+
+      if (job.status === 'error') {
+        clearInterval(iv);
+        errorEl.textContent = `Error: ${job.error}`;
+        errorEl.style.display = 'block';
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }, 2000);
+  }
+
+  // ── YouTube ────────────────────────────────────────────────────
+  async function startYouTube() {
+    const url   = document.getElementById('url-input').value.trim();
+    const model = document.getElementById('yt-model-select').value;
+    if (!url) return;
+
+    const btn = document.getElementById('yt-submit-btn');
+    btn.disabled = true;
+    document.getElementById('yt-steps').style.display = 'flex';
+    document.getElementById('yt-segments-box').style.display = 'none';
+    document.getElementById('yt-result-box').style.display = 'none';
+    document.getElementById('yt-error').style.display = 'none';
+    document.getElementById('yt-segments-list').innerHTML = '';
+    document.getElementById('yt-step-1').className = 'step active';
+
+    const { job_id } = await fetch('/api/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, model }),
+    }).then(r => r.json());
+
+    pollJob(job_id, {
+      stepsEl: document.getElementById('yt-steps'),
+      stepsMap: { downloading: 'yt-step-1', transcribing: 'yt-step-2', saving: 'yt-step-3', done: 'yt-step-4' },
+      segmentsBox:  document.getElementById('yt-segments-box'),
+      segmentsList: document.getElementById('yt-segments-list'),
+      resultBox:    document.getElementById('yt-result-box'),
+      transcriptEl: document.getElementById('yt-transcript'),
+      downloadLink: document.getElementById('yt-download-link'),
+      errorEl:      document.getElementById('yt-error'),
+      submitBtn:    btn,
+    });
+  }
+
+  // ── Voice recording ────────────────────────────────────────────
+  let mediaRecorder = null;
+  let audioChunks   = [];
+  let timerInterval = null;
+  let recSeconds    = 0;
+
+  function toggleRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }
+
+  async function startRecording() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      alert('Microphone access denied. Please allow mic access and try again.');
+      return;
+    }
+
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = submitRecording;
+    mediaRecorder.start();
+
+    document.getElementById('mic-btn').classList.add('recording');
+    document.getElementById('rec-label').textContent = 'Recording... Click to stop';
+    document.getElementById('rec-label').classList.add('recording');
+
+    recSeconds = 0;
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
+  }
+
+  function stopRecording() {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    }
+    clearInterval(timerInterval);
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('rec-label').textContent = 'Processing...';
+    document.getElementById('rec-label').classList.remove('recording');
+  }
+
+  function updateTimer() {
+    recSeconds++;
+    const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+    const s = String(recSeconds % 60).padStart(2, '0');
+    document.getElementById('rec-timer').textContent = `${m}:${s}`;
+  }
+
+  async function submitRecording() {
+    const model = document.getElementById('rec-model-select').value;
+    const blob  = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+    const form  = new FormData();
+    form.append('file', blob, 'recording.webm');
+    form.append('model', model);
+
+    document.getElementById('rec-steps').style.display = 'flex';
+    document.getElementById('rec-segments-box').style.display = 'none';
+    document.getElementById('rec-result-box').style.display = 'none';
+    document.getElementById('rec-error').style.display = 'none';
+    document.getElementById('rec-segments-list').innerHTML = '';
+    document.getElementById('rec-step-1').className = 'step active';
+    document.getElementById('mic-btn').disabled = true;
+
+    const { job_id } = await fetch('/api/transcribe-audio', { method: 'POST', body: form })
+      .then(r => r.json());
+
+    pollJob(job_id, {
+      stepsMap: { transcribing: 'rec-step-1', saving: 'rec-step-2', done: 'rec-step-3' },
+      segmentsBox:  document.getElementById('rec-segments-box'),
+      segmentsList: document.getElementById('rec-segments-list'),
+      resultBox:    document.getElementById('rec-result-box'),
+      transcriptEl: document.getElementById('rec-transcript'),
+      downloadLink: document.getElementById('rec-download-link'),
+      errorEl:      document.getElementById('rec-error'),
+      onDone: () => {
+        document.getElementById('mic-btn').disabled = false;
+        document.getElementById('rec-label').textContent = 'Click to start recording';
+        document.getElementById('rec-timer').textContent = '00:00';
+        recSeconds = 0;
+      },
+    });
+  }
+
+  // ── Utilities ──────────────────────────────────────────────────
+  function copyText(elId) {
+    navigator.clipboard.writeText(document.getElementById(elId).textContent);
+  }
+
+  async function loadOutputs() {
+    const { files } = await fetch('/api/outputs').then(r => r.json());
+    const list = document.getElementById('outputs-list');
+    list.innerHTML = files.length
+      ? files.map(f => `<li><a href="/api/outputs/${encodeURIComponent(f)}" download="${f}">${f}</a></li>`).join('')
+      : '<li style="color:#a1a1a6;">No transcripts yet.</li>';
+  }
+
+  loadOutputs();
+</script>
+</body>
+</html>

@@ -5,8 +5,11 @@ from faster_whisper import WhisperModel
 DEFAULT_MODEL = "small"
 
 
-def transcribe_to_english(audio_path: str, model_name: str = DEFAULT_MODEL) -> str:
-    """Load Whisper model and transcribe audio to English. Always outputs English."""
+def transcribe_to_english(audio_path: str, model_name: str = DEFAULT_MODEL, on_segment=None) -> str:
+    """Load Whisper model and transcribe audio to English. Always outputs English.
+
+    on_segment: optional callback(start, end, text) called for each decoded segment.
+    """
     t0 = time.time()
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
     print(f"    Model loaded in {time.time() - t0:.1f}s", flush=True)
@@ -19,9 +22,11 @@ def transcribe_to_english(audio_path: str, model_name: str = DEFAULT_MODEL) -> s
     for segment in segments:
         text = segment.text.strip()
         print(f"    [{segment.start:6.1f}s -> {segment.end:6.1f}s]  {text}", flush=True)
+        if on_segment:
+            on_segment(segment.start, segment.end, text)
         parts.append(text)
 
-    return " ".join(parts)
+    return "\n".join(parts)
 
 
 def save_transcript(text: str, title: str, output_dir: str = "outputs") -> str:

@@ -1,54 +1,71 @@
-# YouTube Audio Transcriber
+# Audio Transcriber
 
-Download audio from a YouTube video and transcribe it to English text.
-Supports English and Telugu audio.
+Transcribe YouTube videos and live voice recordings to English text.
+Supports English and Telugu audio via OpenAI Whisper.
 
 ## Requirements
 
 - macOS with [Homebrew](https://brew.sh)
-- Python 3.9+
+- Python 3.13+
 - [uv](https://github.com/astral-sh/uv) (`brew install uv`)
+- ffmpeg (`brew install ffmpeg`)
 
 ## Setup
-
-Run once to install all dependencies:
 
 ```bash
 bash setup.sh
 ```
 
-This installs:
-- `ffmpeg` (via Homebrew)
-- `yt-dlp` — YouTube audio downloader
-- `openai-whisper` — transcription engine
+Installs: `ffmpeg`, `yt-dlp`, `faster-whisper`, `fastapi`, `uvicorn`, `tqdm`
+
+## Project Structure
+
+```
+audio-transription/
+├── transcriber/         # core module
+│   ├── __init__.py
+│   ├── downloader.py    # YouTube audio download
+│   └── transcriber.py  # Whisper transcription
+├── recordings/          # audio files — gitignored
+├── outputs/             # transcripts saved here
+├── static/
+│   └── index.html       # web UI
+├── server.py            # FastAPI backend
+├── transcribe.py        # CLI entry point
+├── setup.sh
+└── docs/
+    └── ROADMAP.md
+```
 
 ## Usage
+
+### Web UI
+
+```bash
+source .venv/bin/activate
+uvicorn server:app --reload
+```
+
+Open `http://localhost:8000`
+
+**YouTube tab** — paste a URL, pick model size, click Transcribe. Live segments stream in as Whisper decodes. Transcript and download link appear on completion.
+
+**Record Voice tab** — click the mic button to start recording, click again to stop. Audio is sent to the backend automatically and transcribed using the same pipeline.
+
+### CLI
 
 ```bash
 source .venv/bin/activate
 python transcribe.py <youtube-url>
 ```
 
-**Example:**
-
-```bash
-python transcribe.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-```
-
-Output files saved in the current directory:
-- `<video-title>.mp3` — downloaded audio
-- `<video-title>.txt` — English transcript
-
-## Options
+Options:
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--model` | `small` | Whisper model size |
-| `--output-dir` | `.` | Directory to save audio and transcript |
-
-```bash
-python transcribe.py <url> --model medium --output-dir ./output
-```
+| `--output-dir` | `outputs` | Directory for transcripts |
+| `--recordings-dir` | `recordings` | Directory for audio files |
 
 ## Model Size Guide
 
@@ -60,7 +77,7 @@ python transcribe.py <url> --model medium --output-dir ./output
 | medium | 1.4GB | moderate | better |
 | large | 2.9GB | slow | best |
 
-To change the default model, edit line 17 in `transcribe.py`:
+Default is `small`. To change it, edit `transcriber/transcriber.py`:
 
 ```python
 DEFAULT_MODEL = "medium"
@@ -68,5 +85,7 @@ DEFAULT_MODEL = "medium"
 
 ## Notes
 
-- Telugu audio is automatically translated to English (not just transcribed).
-- First run downloads the Whisper model weights — may take a few minutes depending on model size.
+- Telugu audio is automatically translated to English.
+- First run downloads Whisper model weights — one-time download per model size.
+- Audio files are saved to `recordings/` and excluded from git.
+- Transcripts are saved to `outputs/` as `.txt` files, one line per segment.

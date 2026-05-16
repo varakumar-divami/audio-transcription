@@ -1,0 +1,15 @@
+# Audio recordings — kept locally, never committed
+recordings/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Whisper model cache
+.cache/
+
+# macOS
+.DS_Store
